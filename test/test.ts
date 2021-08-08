@@ -1,5 +1,5 @@
 import test from "tape"
-import Fastify, {FastifyReply, FastifyRequest} from "fastify"
+import Fastify, {FastifyReply, FastifyRequest, LightMyRequestResponse} from "fastify"
 import allowPlugin, {AllowOptions} from "../src"
 
 
@@ -39,45 +39,123 @@ test("register with send405 options set to false", (t) => {
 })
 
 
-test("request tests", (testGroup) => {
+test("request tests, default fastify options", (testGroup) => {
   const app = Fastify()
   const opts: AllowOptions = {send405: true}
   app.register(allowPlugin, opts)
-  app.get("/", (req: FastifyRequest, rep: FastifyReply) => {
-      rep.send("Testing")
+  const routePath = "/:param1/things/:p2"
+  app.get(routePath, (req: FastifyRequest, rep: FastifyReply) => {
+      rep.send("\"Testing\"")
     })
-  app.post("/", (req: FastifyRequest, rep: FastifyReply) => {
+  app.post(routePath, (req: FastifyRequest, rep: FastifyReply) => {
       rep.status(201)
     })
 
   testGroup.test("ALLOW / 405 tests", (t) => {
+    const url = "/abcde/things/123?q=1"
     t.plan(6)
-    app.inject({method: "GET", url: "/"}, (err, res) => {
+    app.inject({method: "GET", url}, (err, res) => {
       t.equal(res.statusCode, 200)
       t.equal(res.headers.allow, "GET, POST")
-      t.equal(res.body, "Testing")
+      t.equal(res.body, "\"Testing\"")
     })
 
-    app.inject({method: "DELETE", url: "/"}, (err, res) => {
+    app.inject({method: "DELETE", url}, (err, res) => {
       t.equal(res.statusCode, 405)
       t.equal(res.headers.allow, "GET, POST")
-      t.deepEqual(JSON.parse(res.body), {
-        message:    "DELETE / not allowed",
+      const data = parseBody(res)
+      t.deepEqual(data, {
+        message:    `DELETE ${url} not allowed`,
         error:      "Method Not Allowed",
         statusCode: 405
       })
     })
   })
 
+  testGroup.test("404 for case sensitive URL", (t) => {
+    t.plan(2)
+    const url = "/ttgg/THINGS/123"
+    app.inject({method: "GET", url}, (err, res) => {
+      t.equal(res.statusCode, 404)
+      const data = parseBody(res)
+      t.deepEqual(data, {
+        message:    `Route GET:${url} not found`,
+        error:      "Not Found",
+        statusCode: 404
+      })
+    })
+  })
+
+  testGroup.test("404 for trailing slash", (t) => {
+    t.plan(2)
+    const url = "/ttgg/things/123/"
+    app.inject({method: "GET", url}, (err, res) => {
+      t.equal(res.statusCode, 404)
+      const data = parseBody(res)
+      t.deepEqual(data, {
+        message:    `Route GET:${url} not found`,
+        error:      "Not Found",
+        statusCode: 404
+      })
+    })
+  })
+
   testGroup.test("404 for non-handled routes", (t) => {
     t.plan(2)
-    app.inject({method: "GET", url: "/no-handler"}, (err, res) => {
+    const url = "/no-handler/test"
+    app.inject({method: "GET", url}, (err, res) => {
       t.equal(res.statusCode, 404)
-      t.deepEqual(JSON.parse(res.body), {
-        message:    "Route GET:/no-handler not found",
+      const data = parseBody(res)
+      t.deepEqual(data, {
+        message:    `Route GET:${url} not found`,
         error:      "Not Found",
         statusCode: 404
       })
     })
   })
 })
+
+test("request tests, fastify caseSensitive, ignoreTrailingSlash options set to opposite of default", (testGroup) => {
+  const app = Fastify({
+    caseSensitive:        false,
+    ignoreTrailingSlash:  true
+  })
+  const opts: AllowOptions = {send405: true}
+  app.register(allowPlugin, opts)
+  const routePath = "/:param/stuff"
+  app.get(routePath, (req: FastifyRequest, rep: FastifyReply) => {
+      rep.send("\"Testing 2\"")
+    })
+
+  testGroup.test("request tests case insensitive matches", (t) => {
+    const url = "/p1/STUFF"
+    t.plan(3)
+    app.inject({method: "GET", url}, (err, res) => {
+      t.equal(res.statusCode, 200)
+      t.equal(res.headers.allow, "GET")
+      t.equal(res.body, "\"Testing 2\"")
+    })
+  })
+
+  testGroup.test("request tests trailing slash matches", (t) => {
+    const url = "/p1/stuff/"
+    t.plan(3)
+    app.inject({method: "DELETE", url}, (err, res) => {
+      t.equal(res.statusCode, 405)
+      t.equal(res.headers.allow, "GET")
+      const data = parseBody(res)
+      t.deepEqual(data, {
+        message:    `DELETE ${url} not allowed`,
+        error:      "Method Not Allowed",
+        statusCode: 405
+      })
+    })
+  })
+})
+
+
+function parseBody(res: LightMyRequestResponse): any {
+  return res.body.length
+    ? JSON.parse(res.body)
+    : ""
+}
