@@ -1,13 +1,12 @@
 {
   "name": "fastify-allow",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Fastify plugin that adds an Allow header with all registered methods to GET and HEAD responses. See https://datatracker.ietf.org/doc/html/rfc7231#section-7.4.1",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test-ts": "ts-node test/test.ts",
-    "test-js": "npm run-script build && node lib/test/test.js"
+    "test": "ts-node test/test.ts"
   },
   "repository": {
     "type": "git",
