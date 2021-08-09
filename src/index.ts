@@ -7,12 +7,14 @@ export interface AllowOptions extends FastifyPluginOptions {
 }
 
 
-type RouteMethodsMap = Map<RegExp, string>
+type RouteMethodsMap = Map<string, string>
+type MatcherMethodsMap = Map<RegExp, string>
 
 
 function captureRouteMethod(caseSensitive:        boolean,
                             ignoreTrailingSlash:  boolean,
                             routeMethods:         RouteMethodsMap,
+                            matcherMethods:       MatcherMethodsMap,
                             routeOptions:         FastifyPluginOptions) {
   const {method, url} = routeOptions
   const pattern = url.replace(/\/:[^/]+/g, "/[^/]+")
@@ -21,7 +23,7 @@ function captureRouteMethod(caseSensitive:        boolean,
   let urlMatcher = new RegExp(`^${pattern}${trailingSlash}$`, flags)
   let urlMethods = ""
 
-  for (const [matcher, methods] of routeMethods.entries()) {
+  for (const [matcher, methods] of matcherMethods.entries()) {
     if (urlMatcher.toString() === matcher.toString()) {
       urlMatcher = matcher
       urlMethods = methods
@@ -33,15 +35,16 @@ function captureRouteMethod(caseSensitive:        boolean,
     urlMethods += ", "
   }
   urlMethods += method
-  routeMethods.set(urlMatcher, urlMethods)
+  routeMethods.set(url, urlMethods)
+  matcherMethods.set(urlMatcher, urlMethods)
 }
 
 
-function handleNotFound(routeMethods: RouteMethodsMap,
-                        request:      FastifyRequest,
-                        reply:        FastifyReply) {
+function handleNotFound(matcherMethods: MatcherMethodsMap,
+                        request:        FastifyRequest,
+                        reply:          FastifyReply) {
   const {url, method} = request
-  const methods = findUrlMethods(routeMethods, url)
+  const methods = findUrlMethods(matcherMethods, url)
   let statusCode, message, error
 
   if (methods) {
@@ -69,17 +72,19 @@ function addAllowHeader(routeMethods: RouteMethodsMap,
                         request:      FastifyRequest,
                         reply:        FastifyReply,
                         done:         () => void) {
-  const {url} = request
-  const methods = findUrlMethods(routeMethods, url)
+  // @ts-ignore config does not have url in it's type declaration
+  const {url} = reply.context.config
+  const methods = routeMethods.get(url)
   if (methods) {
     reply.header("allow", methods)
   }
   done()
 }
 
-function findUrlMethods(routeMethods: RouteMethodsMap,
-                        url:          string): string | undefined {
-  for (const [matcher, urlMethods] of routeMethods.entries()) {
+
+function findUrlMethods(matcherMethods: MatcherMethodsMap,
+                        url:            string): string | undefined {
+  for (const [matcher, urlMethods] of matcherMethods.entries()) {
     if (matcher.test(url)) {
       return urlMethods
     }
@@ -91,12 +96,13 @@ function plugin(fastify:  FastifyInstance,
                 opts:     AllowOptions,
                 done:     () => void) {
   const routeMethods = new Map()
+  const matcherMethods = new Map()
   const {caseSensitive = true, ignoreTrailingSlash = false} = fastify.initialConfig
-  fastify.addHook("onRoute", (o) => captureRouteMethod(caseSensitive, ignoreTrailingSlash, routeMethods, o))
+  fastify.addHook("onRoute", (o) => captureRouteMethod(caseSensitive, ignoreTrailingSlash, routeMethods, matcherMethods, o))
   fastify.addHook("onRequest", (q, p, d) => addAllowHeader(routeMethods, q, p, d))
   const { send405 = true } = opts
   if (send405) {
-    fastify.setNotFoundHandler((q, p) => handleNotFound(routeMethods, q, p))
+    fastify.setNotFoundHandler((q, p) => handleNotFound(matcherMethods, q, p))
   }
   done()
 }
