@@ -3,42 +3,6 @@ import Fastify, {FastifyReply, FastifyRequest, LightMyRequestResponse} from "fas
 import allowPlugin, {AllowOptions} from "../src"
 
 
-test("register without options", (t) => {
-  t.plan(2)
-  const app = Fastify()
-  app.setNotFoundHandler = () => {
-    t.pass("notFoundHandler set")
-    return app
-  }
-  app.register(allowPlugin)
-  app.ready(t.error)
-})
-
-test("register with send405 options set to true", (t) => {
-  t.plan(2)
-  const app = Fastify()
-  app.setNotFoundHandler = () => {
-    t.pass("notFoundHandler set")
-    return app
-  }
-  const opts: AllowOptions = {send405: true}
-  app.register(allowPlugin, opts)
-  app.ready(t.error)
-})
-
-test("register with send405 options set to false", (t) => {
-  t.plan(1)
-  const app = Fastify()
-  app.setNotFoundHandler = () => {
-    t.fail("notFoundHandler should not be set")
-    return app
-  }
-  const opts: AllowOptions = {send405: false}
-  app.register(allowPlugin, opts)
-  app.ready(t.error)
-})
-
-
 test("request tests, default fastify options", (testGroup) => {
   const app = Fastify()
   const opts: AllowOptions = {send405: true}
