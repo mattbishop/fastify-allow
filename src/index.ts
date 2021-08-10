@@ -70,8 +70,8 @@ function handleRequest(routeMethods:    RouteMethodsMap,
         .code(405)
         .send({
           statusCode: 405,
-          message: `${method} ${url} not allowed`,
-          error: "Method Not Allowed"
+          message:    `${method} ${url} not allowed`,
+          error:      "Method Not Allowed"
         })
     }
   }
