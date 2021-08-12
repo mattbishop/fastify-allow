@@ -3,7 +3,7 @@ The HTTP 1.1 specification has an [`Allow` header](https://datatracker.ietf.org/
 
 This plugin adds an `Allow` header to all responses with routes that have registered handlers, regardless of the method they handle. It returns a `405 Not Allowed` response when a route has no supported method handler. This behaviour is different from Fastify's default behaviour, which is to return a `404 Not Found` for unhandled methods on a route.
 
-If a route has no registered method handlers, fastify-allow will send the usual `404 Not Found` response.
+If a route has no registered method handlers, fastify will still send the usual `404 Not Found` response.
 
 ### Install
 
