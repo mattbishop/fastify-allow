@@ -5,7 +5,7 @@ import allowPlugin, {AllowOptions} from "../src"
 
 test("request tests, default fastify options", (testGroup) => {
   const app = Fastify()
-  const opts: AllowOptions = {send405: true}
+  const opts: AllowOptions = { send405: true }
   app.register(allowPlugin, opts)
   const routePath = "/:param1/things/:p2"
   app.get(routePath, (req: FastifyRequest, rep: FastifyReply) => {
@@ -15,21 +15,30 @@ test("request tests, default fastify options", (testGroup) => {
       rep.status(201)
     })
 
+  app.options("*", (req: FastifyRequest, rep: FastifyReply) => {
+    rep.send("\"Testing wildcards\"")
+  })
+
   testGroup.test("ALLOW / 405 tests", (t) => {
     const url = "/abcde/things/123?q=1"
-    t.plan(6)
+    t.plan(9)
     app.inject({method: "GET", url}, (err, res) => {
       t.equal(res.statusCode, 200)
-      t.equal(res.headers.allow, "GET, POST")
+      t.equal(res.headers.allow, "GET, POST, OPTIONS")
       t.equal(res.body, "\"Testing\"")
+    })
+    app.inject({method: "OPTIONS", url: "/wildcard/things/anything/here"}, (err, res) => {
+      t.equal(res.statusCode, 200)
+      t.equal(res.headers.allow, "OPTIONS")
+      t.equal(res.body, "\"Testing wildcards\"")
     })
 
     app.inject({method: "DELETE", url}, (err, res) => {
       t.equal(res.statusCode, 405)
-      t.equal(res.headers.allow, "GET, POST")
+      t.equal(res.headers.allow, "GET, POST, OPTIONS")
       const data = parseBody(res)
       t.deepEqual(data, {
-        message:    `DELETE ${url} not allowed`,
+        message:    `DELETE ${url} not allowed. Examine 'Allow' header for supported methods.`,
         error:      "Method Not Allowed",
         statusCode: 405
       })
@@ -79,24 +88,31 @@ test("request tests, default fastify options", (testGroup) => {
   })
 })
 
-test("request tests, fastify caseSensitive, ignoreTrailingSlash options set to opposite of default", (testGroup) => {
+test("send405ForWildcard, caseSensitive, ignoreTrailingSlash options set to opposite of default", (testGroup) => {
   const app = Fastify({
     caseSensitive:        false,
     ignoreTrailingSlash:  true
   })
-  const opts: AllowOptions = {send405: true}
+  const opts: AllowOptions = {
+    send405:            true,
+    send405ForWildcard: true
+  }
   app.register(allowPlugin, opts)
   const routePath = "/:param/stuff"
   app.get(routePath, (req: FastifyRequest, rep: FastifyReply) => {
       rep.send("\"Testing 2\"")
     })
 
+  app.options("/:param/*", (req: FastifyRequest, rep: FastifyReply) => {
+    rep.send()
+  })
+
   testGroup.test("request tests case insensitive matches", (t) => {
     const url = "/p1/STUFF"
     t.plan(3)
     app.inject({method: "GET", url}, (err, res) => {
       t.equal(res.statusCode, 200)
-      t.equal(res.headers.allow, "GET")
+      t.equal(res.headers.allow, "GET, OPTIONS")
       t.equal(res.body, "\"Testing 2\"")
     })
   })
@@ -106,10 +122,25 @@ test("request tests, fastify caseSensitive, ignoreTrailingSlash options set to o
     t.plan(3)
     app.inject({method: "DELETE", url}, (err, res) => {
       t.equal(res.statusCode, 405)
-      t.equal(res.headers.allow, "GET")
+      t.equal(res.headers.allow, "GET, OPTIONS")
       const data = parseBody(res)
       t.deepEqual(data, {
-        message:    `DELETE ${url} not allowed`,
+        message:    `DELETE ${url} not allowed. Examine 'Allow' header for supported methods.`,
+        error:      "Method Not Allowed",
+        statusCode: 405
+      })
+    })
+  })
+
+  testGroup.test("request tests wildcard returns 405", (t) => {
+    const url = "/p1/other-stuff"
+    t.plan(3)
+    app.inject({method: "DELETE", url}, (err, res) => {
+      t.equal(res.statusCode, 405)
+      t.equal(res.headers.allow, "OPTIONS")
+      const data = parseBody(res)
+      t.deepEqual(data, {
+        message:    `DELETE ${url} not allowed. Examine 'Allow' header for supported methods.`,
         error:      "Method Not Allowed",
         statusCode: 405
       })

@@ -3,74 +3,153 @@ import fp from "fastify-plugin"
 
 
 export interface AllowOptions extends FastifyPluginOptions {
-  send405: boolean
+  send405?:            boolean
+  send405ForWildcard?: boolean
 }
 
 
-type RouteMethodsMap = Map<string, string>
-type MatcherMethodsMap = Map<RegExp, string>
+interface MatcherRoute {
+  matcher:  RegExp
+  route:    string
+}
+
+interface AllowContext {
+  send405:            boolean
+  send405ForWildcard: boolean
+  routeMethods:       Map<string, string>
+  sortedMatchers:     string[]
+  matcherRoutes:      MatcherRoute[]
+}
+
+
+function addSortedMatcher(ctx: AllowContext, matcher: RegExp, route: string) {
+  const {
+    sortedMatchers,
+    matcherRoutes
+  } = ctx
+  /*
+    Replace all the path parts with single characters that sort in the right order.
+
+    static      '"'
+    param       '$'
+    wildcard    '?'
+
+      /static1/:p1/static2/*
+    becomes:
+      /"/$/"/?
+  */
+  const sortablePath = route
+    // wildcards
+    .replace(/\*/g, "?")
+    // params
+    .replace(/\/:[^/]+/g, "/$")
+    // static
+    .replace(/\/[^?$/]+/g, "/\"")
+  const matcherRoute = { matcher, route }
+  let insertPos = sortedMatchers.findIndex(sortedKey => comparePaths(sortablePath, sortedKey) > -1)
+  if (insertPos < 0) {
+    insertPos = sortedMatchers.length
+  }
+  sortedMatchers.splice(insertPos,0, sortablePath)
+  matcherRoutes.splice(insertPos, 0, matcherRoute)
+}
+
+
+function comparePaths(p1: string, p2: string): number {
+  return p1.length === p2.length
+    ? p1.localeCompare(p2)
+      // longest path comes first as it has more URI parts
+    : p1.length - p2.length
+}
 
 
 function captureRouteMethod(caseSensitive:        boolean,
                             ignoreTrailingSlash:  boolean,
-                            routeMethods:         RouteMethodsMap,
-                            matcherMethods:       MatcherMethodsMap,
+                            ctx:                  AllowContext,
                             routeOptions:         FastifyPluginOptions) {
-  const { method, url } = routeOptions
-  const pattern = url.replace(/\/:[^/]+/g, "/[^/]+")
+  const {
+    send405ForWildcard,
+    routeMethods
+  } = ctx
+  const {
+    method,
+    url
+  } = routeOptions
+
+  const wildcardPattern = url.replace(/\*/g, ".+")
+  const isWildcard = wildcardPattern !== url
+  const pattern = wildcardPattern.replace(/\/:[^/]+/g, "/[^/]+")
   const flags = caseSensitive ? "" : "i"
   const trailingSlash = ignoreTrailingSlash ? "/?" : ""
-  let urlMatcher = new RegExp(`^${pattern}${trailingSlash}$`, flags)
-  let urlMethods = ""
-
-  for (const [matcher, methods] of matcherMethods.entries()) {
-    if (urlMatcher.toString() === matcher.toString()) {
-      urlMatcher = matcher
-      urlMethods = methods
-      break
-    }
-  }
+  const urlMatcher = new RegExp(`^${pattern}${trailingSlash}$`, flags)
+  let urlMethods = routeMethods.get(url) || ""
 
   if (urlMethods) {
     urlMethods += ", "
   }
   urlMethods += method
+  const wildcardMatcher = isWildcard ? new RegExp(wildcardPattern) : false
+  for (const [key, value] of routeMethods.entries()) {
+    //  1. Is this url a wildcard url? Yes, are there urls that this one covers? Add method to their methods
+    if (   wildcardMatcher
+        && wildcardMatcher.test(key)
+        && !value.includes(method)) {
+
+        routeMethods.set(key, `${value}, ${method}`)
+    }
+
+    // 2. Are any existing urls wildcards that cover this url? Add their missing methods to your methods.
+    if (   key.endsWith("*")
+        && url.startsWith(key.slice(0, key.length - 1))) {
+
+      const otherMethods = value.split(", ")
+      urlMethods = otherMethods.reduce((acc, m) => {
+        if (!acc.includes(m)) {
+          acc = `${acc}, ${m}`
+        }
+        return acc
+      }, urlMethods)
+    }
+  }
+
   routeMethods.set(url, urlMethods)
-  matcherMethods.set(urlMatcher, urlMethods)
+  if (!isWildcard || send405ForWildcard) {
+    addSortedMatcher(ctx, urlMatcher, url)
+  }
 }
 
 
-function handleRequest(routeMethods:    RouteMethodsMap,
-                       matcherMethods:  MatcherMethodsMap,
-                       send405:         boolean,
-                       request:         FastifyRequest,
-                       reply:           FastifyReply,
-                       done:            () => void) {
+function handleRequest(ctx:     AllowContext,
+                       request: FastifyRequest,
+                       reply:   FastifyReply,
+                       done:    () => void) {
   const {
+    routeMethods,
+    matcherRoutes,
+    send405
+  } = ctx
+  let {
     url,
     method,
     // @ts-ignore request does not have context in it's type declaration
     context: {
       config: {
-        url: path
+        url: path = findUrlRoute(matcherRoutes, url)
       }
     }
   } = request
 
-  const methods = path
-    ? routeMethods.get(path)
-    : findUrlMethods(matcherMethods, url)
+  const methods = routeMethods.get(path)
 
   if (methods) {
     reply.header("allow", methods)
 
     if (send405 && !methods.includes(method)) {
-      // send 405
       reply
         .code(405)
         .send({
           statusCode: 405,
-          message:    `${method} ${url} not allowed`,
+          message:    `${method} ${url} not allowed. Examine 'Allow' header for supported methods.`,
           error:      "Method Not Allowed"
         })
     }
@@ -79,11 +158,11 @@ function handleRequest(routeMethods:    RouteMethodsMap,
 }
 
 
-function findUrlMethods(matcherMethods: MatcherMethodsMap,
-                        url:            string): string | undefined {
-  for (const [matcher, urlMethods] of matcherMethods.entries()) {
+function findUrlRoute(matcherToRoute: MatcherRoute[],
+                      url:            string): string | undefined {
+  for (const { matcher, route } of matcherToRoute) {
     if (matcher.test(url)) {
-      return urlMethods
+      return route
     }
   }
 }
@@ -92,12 +171,17 @@ function findUrlMethods(matcherMethods: MatcherMethodsMap,
 function plugin(fastify:  FastifyInstance,
                 opts:     AllowOptions,
                 done:     () => void) {
-  const { send405 = true } = opts
+  const { send405 = true, send405ForWildcard = false } = opts
   const { caseSensitive = true, ignoreTrailingSlash = false } = fastify.initialConfig
-  const routeMethods = new Map()
-  const matcherMethods = new Map()
-  fastify.addHook("onRoute", (o) => captureRouteMethod(caseSensitive, ignoreTrailingSlash, routeMethods, matcherMethods, o))
-  fastify.addHook("onRequest", (q, p, d) => handleRequest(routeMethods, matcherMethods, send405, q, p, d))
+  const ctx = {
+    send405,
+    send405ForWildcard,
+    routeMethods:   new Map(),
+    sortedMatchers: [],
+    matcherRoutes:  []
+  }
+  fastify.addHook("onRoute", (o) => captureRouteMethod(caseSensitive, ignoreTrailingSlash, ctx, o))
+  fastify.addHook("onRequest", (q, p, d) => handleRequest(ctx, q, p, d))
   done()
 }
 
