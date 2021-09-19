@@ -131,15 +131,10 @@ function handleRequest(ctx:     AllowContext,
   let {
     url,
     method,
-    // @ts-ignore request does not have context in it's type declaration
-    context: {
-      config: {
-        url: path = findUrlRoute(matcherRoutes, url)
-      }
-    }
+    routerPath = findUrlRoute(matcherRoutes, url) || ""
   } = request
 
-  const methods = routeMethods.get(path)
+  const methods = routeMethods.get(routerPath)
 
   if (methods) {
     reply.header("allow", methods)
