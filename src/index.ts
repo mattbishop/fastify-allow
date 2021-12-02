@@ -128,7 +128,7 @@ function handleRequest(ctx:     AllowContext,
     matcherRoutes,
     send405
   } = ctx
-  let {
+  const {
     url,
     method,
     routerPath = findUrlRoute(matcherRoutes, url) || ""
