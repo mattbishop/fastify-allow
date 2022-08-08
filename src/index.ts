@@ -76,33 +76,34 @@ function captureRouteMethod(caseSensitive:        boolean,
     url
   } = routeOptions
 
-  const wildcardPattern = url.replace(/\*/g, ".+")
-  const isWildcard = wildcardPattern !== url
-  const pattern = wildcardPattern.replace(/\/:[^/]+/g, "/[^/]+")
-  const flags = caseSensitive ? "" : "i"
-  const trailingSlash = ignoreTrailingSlash ? "/?" : ""
-  const urlMatcher = new RegExp(`^${pattern}${trailingSlash}$`, flags)
-  let urlMethods = routeMethods.get(url) || ""
+  const urlPattern = url.replace(/\*/g, ".+")
+  const isWildcard = urlPattern !== url
+  const urlMatcher = buildUrlMatcher(urlPattern, caseSensitive, ignoreTrailingSlash);
 
+  let urlMethods = routeMethods.get(url) || ""
   if (urlMethods) {
     urlMethods += ", "
   }
   urlMethods += method
-  const wildcardMatcher = isWildcard ? new RegExp(wildcardPattern) : false
-  for (const [key, value] of routeMethods.entries()) {
-    //  1. Is this url a wildcard url? Yes, are there urls that this one covers? Add method to their methods
-    if (   wildcardMatcher
-        && wildcardMatcher.test(key)
-        && !value.includes(method)) {
 
-        routeMethods.set(key, `${value}, ${method}`)
+  const wildcardRouteMatcher = isWildcard
+    ? new RegExp(`^${urlPattern}`)
+    : false
+
+  for (const [aRoute, aRouteMethods] of routeMethods.entries()) {
+    //  1. Is this url a wildcard route? Yes, are there urls that this one covers? Add method to their methods
+    if (   wildcardRouteMatcher
+        && wildcardRouteMatcher.test(aRoute)
+        && !aRouteMethods.includes(method)) {
+
+      routeMethods.set(aRoute, `${aRouteMethods}, ${method}`)
     }
 
     // 2. Are any existing urls wildcards that cover this url? Add their missing methods to your methods.
-    if (   key.endsWith("*")
-        && url.startsWith(key.slice(0, key.length - 1))) {
+    if (   aRoute.endsWith("*")
+        && url.startsWith(aRoute.slice(0, aRoute.length - 1))) {
 
-      const otherMethods = value.split(", ")
+      const otherMethods = aRouteMethods.split(", ")
       urlMethods = otherMethods.reduce((acc, m) => {
         if (!acc.includes(m)) {
           acc = `${acc}, ${m}`
@@ -116,6 +117,14 @@ function captureRouteMethod(caseSensitive:        boolean,
   if (!isWildcard || send405ForWildcard) {
     addSortedMatcher(ctx, urlMatcher, url)
   }
+}
+
+
+function buildUrlMatcher(wildcardPattern: string, caseSensitive: boolean, ignoreTrailingSlash: boolean): RegExp {
+  const pattern = wildcardPattern.replace(/\/:[^/]+/g, "/[^/]+")
+  const flags = caseSensitive ? "" : "i"
+  const trailingSlash = ignoreTrailingSlash ? "/?" : ""
+  return new RegExp(`^${pattern}${trailingSlash}$`, flags)
 }
 
 
@@ -182,6 +191,6 @@ function plugin(fastify:  FastifyInstance,
 
 
 export default fp(plugin, {
-  name: "fastify-allow",
-  fastify: ">=3.x"
+  name:     "fastify-allow",
+  fastify:  ">=3.x"
 })

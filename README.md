@@ -1,7 +1,7 @@
 # Fastify Allow Plugin
-The HTTP 1.1 specification has an [`Allow` header](https://datatracker.ietf.org/doc/html/rfc7231#section-7.4.1) for resources to include in client responses, indicating all the methods the resource supports. All resource requests return the `Allow` header so client develpers can discover all of the allowable methods on the resource. If a resource does not support a method, for instance, `DELETE`, then the response status will be `405 Not Allowed` along with the `Allow` header.
+The HTTP 1.1 specification has an [`Allow` header](https://datatracker.ietf.org/doc/html/rfc7231#section-7.4.1) for resources to include in client responses, indicating all the methods the resource supports. All resource requests return the `Allow` header so client developers can discover all the allowable methods on the resource. If a resource does not support a method, for instance, `DELETE`, then the response status will be `405 Not Allowed` along with the `Allow` header.
 
-This plugin adds an `Allow` header to all responses with routes that have registered handlers, regardless of the method they handle. It returns a `405 Not Allowed` response when a route has no supported method handler. This behaviour is different from Fastify's default behaviour, which is to return a `404 Not Found` for unhandled methodson a route.
+This plugin adds an `Allow` header to all responses with routes that have registered handlers, regardless of the method they handle. It returns a `405 Not Allowed` response when a route has no supported method handler. This behaviour is different from Fastify's default behaviour, which is to return a `404 Not Found` for unhandled methods on a route.
 
 If a route has no registered method handlers, fastify-allow will send the usual `404 Not Found` response.
 
@@ -57,9 +57,9 @@ fastify.options('*', optionsHandler)
 
 if `send405` is set to false, then `send405ForWildcard` is ignored.
 
-| Option               | Description                                                  | Default value |
-| -------------------- | ------------------------------------------------------------ | ------------- |
-| `send405`            | Controls whether or not to send `405 Not Allowed` status codes for request that have handlers for other methods, just not the one being sent. | `true`        |
+| Option               | Description                                                                                                                                                                           | Default value |
+|----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
+| `send405`            | Controls whether or not to send `405 Not Allowed` status codes for request that have handlers for other methods, just not the one being sent.                                         | `true`        |
 | `send405ForWildcard` | Only applies when `send405` is true. Wildcard routes that have no non-wildcard route handlers will still return 405 `Not Allowed` for requests that have a matching wildcard handler. | `false`       |
 
 

@@ -107,6 +107,15 @@ test("send405ForWildcard, caseSensitive, ignoreTrailingSlash options set to oppo
     rep.send()
   })
 
+  testGroup.test("request tests prefix-different matches", (t) => {
+    const url = "/not/p1/things"
+    t.plan(2)
+    app.inject({method: "GET", url}, (err, res) => {
+      t.equal(res.statusCode, 405)
+      t.equal(res.headers.allow, "OPTIONS")
+    })
+  })
+
   testGroup.test("request tests case insensitive matches", (t) => {
     const url = "/p1/STUFF"
     t.plan(3)
