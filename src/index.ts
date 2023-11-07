@@ -140,7 +140,9 @@ function handleRequest(ctx:     AllowContext,
   const {
     url,
     method,
-    routerPath = findUrlRoute(matcherRoutes, url) || ""
+    routeOptions: {
+      url: routerPath = findUrlRoute(matcherRoutes, url) || ""
+    }
   } = request
 
   const methods = routeMethods.get(routerPath)
@@ -192,5 +194,5 @@ function plugin(fastify:  FastifyInstance,
 
 export default fp(plugin, {
   name:     "fastify-allow",
-  fastify:  ">=3.x"
+  fastify:  ">=4.x"
 })

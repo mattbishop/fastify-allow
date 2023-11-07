@@ -1,8 +1,8 @@
-/// <reference types="node" />
-import { FastifyPluginOptions } from "fastify";
+import { FastifyInstance, FastifyPluginOptions } from "fastify";
 export interface AllowOptions extends FastifyPluginOptions {
     send405?: boolean;
     send405ForWildcard?: boolean;
 }
-declare const _default: import("fastify").FastifyPluginCallback<AllowOptions, import("http").Server>;
+declare function plugin(fastify: FastifyInstance, opts: AllowOptions, done: () => void): void;
+declare const _default: typeof plugin;
 export default _default;
