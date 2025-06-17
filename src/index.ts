@@ -1,4 +1,4 @@
-import {FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyRequest} from "fastify"
+import { FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyRequest } from "fastify"
 import fp from "fastify-plugin"
 
 
@@ -192,7 +192,9 @@ function plugin(fastify:  FastifyInstance,
 }
 
 
-export default fp(plugin, {
+const FastifyAllowPlugin = fp(plugin, {
   name:     "fastify-allow",
   fastify:  ">=4.x"
 })
+
+export default FastifyAllowPlugin

@@ -4,5 +4,5 @@ export interface AllowOptions extends FastifyPluginOptions {
     send405ForWildcard?: boolean;
 }
 declare function plugin(fastify: FastifyInstance, opts: AllowOptions, done: () => void): void;
-declare const _default: typeof plugin;
-export default _default;
+declare const FastifyAllowPlugin: typeof plugin;
+export default FastifyAllowPlugin;

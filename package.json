@@ -6,7 +6,7 @@
   "types": "lib/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "ts-node test/test.ts"
+    "test": "tsx --test test/test.ts"
   },
   "repository": {
     "type": "git",
@@ -30,10 +30,9 @@
     "fastify-plugin": "^4.5.1"
   },
   "devDependencies": {
-    "@types/tape": "^5.6.3",
+    "@types/node": "24.0.3",
     "fastify": "^4.23.2",
-    "tape": "^5.7.2",
-    "ts-node": "^10.9.1",
+    "tsx": "^4.20.3",
     "typescript": "^5.2.2"
   }
 }
