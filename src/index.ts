@@ -192,7 +192,7 @@ function plugin(fastify:  FastifyInstance,
 }
 
 
-const FastifyAllowPlugin = fp(plugin, {
+export const FastifyAllowPlugin = fp(plugin, {
   name:     "fastify-allow",
   fastify:  ">=4.x"
 })
